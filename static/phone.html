@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>CineML — Camera</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+  background: #000;
+  color: #fff;
+  font-family: 'Courier New', monospace;
+  height: 100vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ── BOOT SCREEN ── */
+#boot {
+  position: fixed; inset: 0;
+  background: #000;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+.logo {
+  font-size: 52px;
+  font-weight: 900;
+  letter-spacing: 10px;
+  color: #fff;
+  font-family: 'Courier New', monospace;
+}
+.logo span { color: #e8c97a; }
+.tagline {
+  font-size: 9px;
+  letter-spacing: 6px;
+  color: #555;
+  margin-top: 6px;
+}
+.boot-bar-wrap {
+  width: 180px;
+  height: 1px;
+  background: #222;
+  margin-top: 40px;
+}
+.boot-bar-fill {
+  height: 100%;
+  background: #e8c97a;
+  width: 0%;
+  transition: width 0.4s ease;
+}
+.boot-msg {
+  font-size: 8px;
+  letter-spacing: 2px;
+  color: #444;
+  margin-top: 12px;
+}
+
+/* ── CAMERA VIEW ── */
+#camView {
+  display: none;
+  position: fixed; inset: 0;
+  background: #000;
+}
+video {
+  width: 100%; height: 100%;
+  object-fit: cover;
+}
+
+/* ── STATUS OVERLAY ── */
+#statusOverlay {
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  padding: 16px 20px 32px;
+  background: linear-gradient(to top, rgba(0,0,0,0.9), transparent);
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+}
+.status-left { display: flex; flex-direction: column; gap: 4px; }
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 8px;
+  letter-spacing: 1.5px;
+  padding: 4px 10px;
+  border: 1px solid;
+  border-radius: 20px;
+}
+.pill-conn  { border-color: #e8c97a; color: #e8c97a; }
+.pill-lut   { border-color: #4ac9e3; color: #4ac9e3; }
+.pill-rec   { border-color: #e84040; color: #e84040; }
+.dot {
+  width: 5px; height: 5px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.dot.blink { animation: blink 1s infinite; }
+@keyframes blink { 0%,100%{opacity:1}50%{opacity:0} }
+
+.status-right {
+  font-size: 9px;
+  color: #444;
+  letter-spacing: 1px;
+  text-align: right;
+  line-height: 1.8;
+}
+
+/* ── TOP BAR ── */
+#topBar {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  padding: 14px 20px 30px;
+  background: linear-gradient(to bottom, rgba(0,0,0,0.8), transparent);
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+.mini-logo {
+  font-size: 14px;
+  font-weight: 900;
+  letter-spacing: 4px;
+}
+.mini-logo span { color: #e8c97a; }
+.cam-badge {
+  font-size: 8px;
+  letter-spacing: 2px;
+  color: #555;
+  border: 1px solid #333;
+  padding: 3px 8px;
+  border-radius: 2px;
+}
+
+/* ── FLIP BUTTON ── */
+#flipBtn {
+  position: fixed;
+  top: 50%;
+  right: 16px;
+  transform: translateY(-50%);
+  width: 44px; height: 44px;
+  border-radius: 50%;
+  border: 1px solid rgba(255,255,255,0.2);
+  background: rgba(0,0,0,0.5);
+  color: #fff;
+  font-size: 18px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+</style>
+</head>
+<body>
+
+<!-- BOOT -->
+<div id="boot">
+  <div class="logo">CINE<span>ML</span></div>
+  <div class="tagline">PRO CINEMA SYSTEM</div>
+  <div class="boot-bar-wrap">
+    <div class="boot-bar-fill" id="bootFill"></div>
+  </div>
+  <div class="boot-msg" id="bootMsg">INITIALIZING...</div>
+</div>
+
+<!-- CAMERA VIEW -->
+<div id="camView">
+  <video id="vid" autoplay playsinline muted></video>
+
+  <div id="topBar">
+    <div class="mini-logo">CINE<span>ML</span></div>
+    <div class="cam-badge">CAMERA UNIT</div>
+  </div>
+
+  <button id="flipBtn" onclick="flipCam()">⇄</button>
+
+  <div id="statusOverlay">
+    <div class="status-left">
+      <div class="status-pill pill-conn">
+        <div class="dot blink" id="connDot"></div>
+        <span id="connText">CONNECTING</span>
+      </div>
+      <div class="status-pill pill-lut">
+        <div class="dot"></div>
+        <span id="lutText">LUT: —</span>
+      </div>
+      <div class="status-pill pill-rec" id="recPill" style="display:none">
+        <div class="dot blink"></div>
+        <span>RECORDING</span>
+      </div>
+    </div>
+    <div class="status-right">
+      <div id="sceneText">SCENE: —</div>
+      <div id="fpsText">— FPS</div>
+      <div id="resText">— × —</div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Config
+const WS_PORT = 8444;
+
+// Auto-detect WebSocket URL
+async function getWSUrl() {
+  try {
+    const r = await fetch('/ws_url.txt');
+    if (r.ok) { const u = (await r.text()).trim(); if (u.startsWith('wss://')) return u; }
+  } catch(e){}
+  return `wss://${location.hostname}:${WS_PORT}`;
+}
+
+let stream = null;
+let ws = null;
+let facingMode = 'environment';
+let frameCount = 0, lastFps = performance.now();
+let sendInterval = null;
+
+// ── BOOT SEQUENCE
+async function boot() {
+  const fill = document.getElementById('bootFill');
+  const msg  = document.getElementById('bootMsg');
+
+  const step = async (pct, text, fn) => {
+    fill.style.width = pct + '%';
+    msg.textContent  = text;
+    if (fn) await fn();
+    await delay(500);
+  };
+
+  await step(20,  'STARTING CAMERA...', startCamera);
+  await step(55,  'CONNECTING TO LAPTOP...', connectWS);
+  await step(85,  'SYNCHRONIZING...');
+  await step(100, 'READY');
+
+  await delay(600);
+  document.getElementById('boot').style.transition = 'opacity 0.8s';
+  document.getElementById('boot').style.opacity = '0';
+  setTimeout(() => {
+    document.getElementById('boot').style.display = 'none';
+    document.getElementById('camView').style.display = 'block';
+  }, 800);
+}
+
+async function startCamera() {
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode, width:{ideal:1920}, height:{ideal:1080}, frameRate:{ideal:30} },
+      audio: true
+    });
+    const vid = document.getElementById('vid');
+    vid.srcObject = stream;
+    await vid.play();
+    const t = stream.getVideoTracks()[0].getSettings();
+    document.getElementById('resText').textContent = (t.width||'?') + ' × ' + (t.height||'?');
+  } catch(e) {
+    document.getElementById('bootMsg').textContent = 'CAMERA ERROR: ' + e.message;
+  }
+}
+
+function flipCam() {
+  facingMode = facingMode === 'environment' ? 'user' : 'environment';
+  if (stream) stream.getTracks().forEach(t => t.stop());
+  startCamera();
+}
+
+// ── WEBSOCKET
+async function connectWS() {
+  const url = await getWSUrl();
+  ws = new WebSocket(url);
+
+  ws.onopen = () => {
+    document.getElementById('connText').textContent = 'LAPTOP CONNECTED';
+    document.getElementById('connDot').style.background = '#4ae880';
+    startSendingFrames();
+  };
+
+  ws.onmessage = (e) => {
+    const data = JSON.parse(e.data);
+    if (data.type === 'grade') {
+      document.getElementById('lutText').textContent  = 'LUT: ' + (data.lut?.name || '—');
+      document.getElementById('sceneText').textContent = 'SCENE: ' + (data.scene || '—').replace(/_/g,' ').toUpperCase();
+    }
+    if (data.type === 'rec_start') document.getElementById('recPill').style.display = 'flex';
+    if (data.type === 'rec_stop')  document.getElementById('recPill').style.display = 'none';
+  };
+
+  ws.onclose = () => {
+    document.getElementById('connText').textContent = 'RECONNECTING...';
+    document.getElementById('connDot').style.background = '#e8c97a';
+    clearInterval(sendInterval);
+    setTimeout(connectWS, 3000);
+  };
+}
+
+// ── SEND FRAMES TO LAPTOP
+const thumb = Object.assign(document.createElement('canvas'), {width:320, height:180});
+const tCtx  = thumb.getContext('2d');
+
+function startSendingFrames() {
+  clearInterval(sendInterval);
+  const vid = document.getElementById('vid');
+
+  sendInterval = setInterval(() => {
+    if (!vid.videoWidth || !ws || ws.readyState !== 1) return;
+
+    // Full frame for ML analysis (every 1.5s — handled by server throttle)
+    tCtx.drawImage(vid, 0, 0, 320, 180);
+    const jpeg = thumb.toDataURL('image/jpeg', 0.7).split(',')[1];
+    ws.send(JSON.stringify({ type: 'frame', jpeg, w: 320, h: 180 }));
+
+    // FPS counter
+    frameCount++;
+    const now = performance.now();
+    if (now - lastFps > 1000) {
+      document.getElementById('fpsText').textContent = frameCount + ' FPS';
+      frameCount = 0;
+      lastFps = now;
+    }
+  }, 50); // send at ~20fps for preview
+}
+
+const delay = ms => new Promise(r => setTimeout(r, ms));
+window.addEventListener('load', boot);
+</script>
+</body>
+</html>

@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CineML Pro — Control</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Bebas+Neue&display=swap');
+
+:root {
+  --bg:       #080808;
+  --panel:    #0f0f0f;
+  --border:   rgba(255,255,255,0.07);
+  --accent:   #e8c97a;
+  --cyan:     #4ac9e3;
+  --red:      #e84040;
+  --green:    #4ae880;
+  --muted:    #444;
+  --text:     #ccc;
+  --mono:     'Share Tech Mono', monospace;
+  --display:  'Bebas Neue', sans-serif;
+}
+
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+  font-family: var(--mono);
+  background: var(--bg);
+  color: var(--text);
+  height: 100vh;
+  overflow: hidden;
+  display: grid;
+  grid-template-rows: 48px 1fr 36px;
+  grid-template-columns: 1fr 280px;
+}
+
+/* ══ BOOT ══ */
+#boot {
+  position: fixed; inset: 0;
+  background: #000;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  z-index: 999;
+  gap: 14px;
+}
+.boot-logo { font-family: var(--display); font-size: 80px; letter-spacing: 12px; }
+.boot-logo span { color: var(--accent); }
+.boot-sub  { font-size: 9px; letter-spacing: 8px; color: var(--muted); }
+.boot-bar  { width: 240px; height: 1px; background: #1a1a1a; margin-top: 30px; }
+.boot-fill { height: 100%; background: var(--accent); width: 0%; transition: width 0.3s; }
+.boot-step { font-size: 8px; letter-spacing: 2px; color: #333; margin-top: 10px; }
+.boot-version { font-size: 7px; color: #222; margin-top: 40px; letter-spacing: 3px; }
+
+/* ══ TOPBAR ══ */
+#topbar {
+  grid-column: 1 / -1;
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  gap: 20px;
+}
+.logo-sm { font-family: var(--display); font-size: 22px; letter-spacing: 4px; color: #fff; }
+.logo-sm span { color: var(--accent); }
+.top-divider { width: 1px; height: 20px; background: var(--border); }
+.top-badge {
+  font-size: 7px; letter-spacing: 1.5px;
+  padding: 3px 8px;
+  border: 1px solid var(--border);
+  border-radius: 1px;
+  color: var(--muted);
+}
+.top-badge.active { border-color: var(--green); color: var(--green); }
+.top-badge.rec    { border-color: var(--red);   color: var(--red);   }
+.spacer { flex: 1; }
+.top-time { font-size: 10px; color: var(--muted); letter-spacing: 2px; }
+
+/* ══ MAIN MONITOR ══ */
+#monitor {
+  position: relative;
+  background: #000;
+  overflow: hidden;
+}
+
+#previewCanvas {
+  width: 100%; height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
+/* Monitor overlays */
+.mon-overlay {
+  position: absolute; inset: 0;
+  pointer-events: none;
+}
+
+/* Rule of thirds */
+.grid-line {
+  position: absolute;
+  background: rgba(255,255,255,0.06);
+}
+
+/* Letterbox */
+.lbox { position: absolute; left:0; right:0; background: #000; transition: height 0.3s; }
+#lboxTop { top:0; height:0; }
+#lboxBot { bottom:0; height:0; }
+
+/* Safe area guides */
+.safe-frame {
+  position: absolute;
+  border: 1px solid rgba(255,255,255,0.08);
+  pointer-events: none;
+}
+
+/* Monitor HUD */
+#monHud {
+  position: absolute; inset: 0;
+  padding: 12px;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+.mon-top {
+  display: flex; justify-content: space-between; align-items: flex-start;
+}
+.mon-bot {
+  display: flex; justify-content: space-between; align-items: flex-end;
+}
+.hud-badge {
+  font-size: 8px; letter-spacing: 1.5px;
+  padding: 3px 8px; border: 1px solid;
+  margin-bottom: 4px; display: block;
+}
+.hud-scene { border-color: var(--cyan); color: var(--cyan); }
+.hud-lut   { border-color: var(--accent); color: var(--accent); }
+.hud-conf  { border-color: var(--muted); color: var(--muted); font-size: 7px; }
+
+.rec-indicator {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 9px; letter-spacing: 2px;
+}
+.rec-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--red);
+  display: none;
+  animation: blink 0.8s infinite;
+}
+.rec-dot.on { display: block; }
+@keyframes blink { 0%,100%{opacity:1}50%{opacity:0} }
+
+/* Scopes */
+#scopes {
+  position: absolute;
+  bottom: 50px; left: 10px;
+  display: flex; gap: 6px;
+}
+.scope-canvas {
+  border: 1px solid rgba(255,255,255,0.1);
+  opacity: 0.8;
+}
+
+/* Focus peaking overlay */
+#peakCanvas {
+  position: absolute; inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+#peakCanvas.on { opacity: 1; }
+
+/* Zebra overlay */
+#zebraCanvas {
+  position: absolute; inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+#zebraCanvas.on { opacity: 0.5; }
+
+/* ══ CONTROL PANEL ══ */
+#panel {
+  background: var(--panel);
+  border-left: 1px solid var(--border);
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: #222 transparent;
+  display: flex;
+  flex-direction: column;
+}
+
+.section {
+  border-bottom: 1px solid var(--border);
+  padding: 12px 14px;
+}
+.section-title {
+  font-size: 7px; letter-spacing: 2px; color: var(--muted);
+  margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center;
+}
+.section-title span { color: var(--accent); }
+
+/* LUT grid */
+.lut-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 5px;
+}
+.lut-card {
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  padding: 8px 6px;
+  cursor: pointer;
+  transition: border-color 0.15s, transform 0.1s;
+  display: flex; flex-direction: column; gap: 2px;
+}
+.lut-card:hover { border-color: rgba(255,255,255,0.2); transform: scale(1.02); }
+.lut-card.active { border-color: var(--accent); }
+.lut-card-name { font-size: 9px; letter-spacing: 1px; color: #fff; }
+.lut-card-grade { font-size: 7px; color: var(--muted); }
+.lut-card-swatch {
+  height: 28px; border-radius: 1px; margin-bottom: 4px;
+}
+
+/* Sliders */
+.slider-row {
+  display: flex; align-items: center; gap: 8px;
+  margin-bottom: 8px;
+}
+.slider-label { font-size: 7px; color: var(--muted); letter-spacing: 1px; width: 32px; flex-shrink: 0; }
+.slider-val   { font-size: 8px; color: var(--accent); width: 36px; text-align: right; flex-shrink: 0; }
+input[type=range] {
+  flex: 1;
+  -webkit-appearance: none;
+  height: 2px;
+  background: rgba(255,255,255,0.1);
+  border-radius: 1px;
+  outline: none;
+  cursor: pointer;
+}
+input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 12px; height: 12px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 2px solid #000;
+}
+input[type=range]::-moz-range-thumb {
+  width: 12px; height: 12px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 2px solid #000;
+}
+
+/* Buttons */
+.btn-row { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 4px; }
+.btn {
+  font-family: var(--mono);
+  font-size: 7px; letter-spacing: 1px;
+  padding: 5px 10px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  border-radius: 1px;
+  transition: border-color 0.15s, color 0.15s;
+  white-space: nowrap;
+}
+.btn:hover { border-color: rgba(255,255,255,0.2); color: var(--text); }
+.btn.active { border-color: var(--accent); color: var(--accent); }
+.btn.danger.active { border-color: var(--red); color: var(--red); }
+.btn-big {
+  width: 100%; padding: 10px;
+  font-size: 9px; letter-spacing: 2px;
+  margin-top: 4px;
+}
+.btn-rec {
+  border-color: var(--red); color: var(--red);
+}
+.btn-rec.recording { background: var(--red); color: #000; }
+
+/* ML status */
+.ml-status {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 0;
+}
+.ml-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--muted);
+  transition: background 0.3s;
+}
+.ml-dot.ok  { background: var(--green); }
+.ml-dot.err { background: var(--red); }
+.ml-text { font-size: 8px; letter-spacing: 1px; }
+
+/* Scene info */
+.scene-card {
+  background: rgba(255,255,255,0.03);
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  padding: 8px;
+  margin-top: 6px;
+}
+.scene-name { font-size: 10px; color: var(--cyan); letter-spacing: 1px; }
+.scene-meta { font-size: 7px; color: var(--muted); margin-top: 3px; }
+.scene-conf { font-size: 8px; color: var(--accent); margin-top: 5px; }
+
+/* Readout grid */
+.readout-grid {
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: 5px;
+}
+.readout-card {
+  background: rgba(255,255,255,0.03);
+  border: 1px solid var(--border);
+  padding: 6px 8px;
+  border-radius: 1px;
+}
+.r-label { font-size: 6px; color: var(--muted); letter-spacing: 1px; }
+.r-val   { font-size: 11px; color: #fff; margin-top: 2px; }
+
+/* ══ STATUSBAR ══ */
+#statusbar {
+  grid-column: 1 / -1;
+  background: var(--panel);
+  border-top: 1px solid var(--border);
+  display: flex; align-items: center;
+  padding: 0 14px; gap: 16px;
+  font-size: 7px; letter-spacing: 1px; color: var(--muted);
+}
+.sb-item { display: flex; align-items: center; gap: 5px; }
+.sb-dot  { width: 5px; height: 5px; border-radius: 50%; background: var(--muted); }
+.sb-dot.green { background: var(--green); }
+.sb-dot.red   { background: var(--red); }
+.sb-dot.yellow{ background: var(--accent); }
+</style>
+</head>
+<body>
+
+<!-- ══ BOOT ══ -->
+<div id="boot">
+  <div class="boot-logo">CINE<span>ML</span></div>
+  <div class="boot-sub">PROFESSIONAL CINEMA CONTROL SYSTEM</div>
+  <div class="boot-bar"><div class="boot-fill" id="bootFill"></div></div>
+  <div class="boot-step" id="bootStep">INITIALIZING...</div>
+  <div class="boot-version">VERSION 3.0 · GPU ACCELERATED · ML POWERED</div>
+</div>
+
+<!-- ══ TOPBAR ══ -->
+<div id="topbar">
+  <div class="logo-sm">CINE<span>ML</span></div>
+  <div class="top-divider"></div>
+  <div class="top-badge" id="tbConn">● WAITING FOR PHONE</div>
+  <div class="top-badge" id="tbML">ML: OFFLINE</div>
+  <div class="top-badge" id="tbFPS">-- FPS</div>
+  <div class="top-badge rec" id="tbRec" style="display:none">● REC</div>
+  <div class="spacer"></div>
+  <div class="top-time" id="clock">--:--:--</div>
+</div>
+
+<!-- ══ MONITOR ══ -->
+<div id="monitor">
+  <canvas id="previewCanvas"></canvas>
+
+  <!-- Grid -->
+  <div class="mon-overlay">
+    <div class="grid-line" style="left:33.33%;top:0;width:1px;height:100%"></div>
+    <div class="grid-line" style="left:66.66%;top:0;width:1px;height:100%"></div>
+    <div class="grid-line" style="top:33.33%;left:0;height:1px;width:100%"></div>
+    <div class="grid-line" style="top:66.66%;left:0;height:1px;width:100%"></div>
+    <div class="safe-frame" style="inset:5%"></div>
+  </div>
+
+  <!-- Letterbox -->
+  <div class="lbox" id="lboxTop"></div>
+  <div class="lbox" id="lboxBot"></div>
+
+  <!-- Focus peaking canvas -->
+  <canvas id="peakCanvas"></canvas>
+  <!-- Zebra canvas -->
+  <canvas id="zebraCanvas"></canvas>
+
+  <!-- Scopes -->
+  <div id="scopes">
+    <canvas class="scope-canvas" id="histCanvas" width="100" height="54"></canvas>
+    <canvas class="scope-canvas" id="waveCanvas"  width="100" height="54"></canvas>
+    <canvas class="scope-canvas" id="vectorCanvas" width="54"  height="54"></canvas>
+  </div>
+
+  <!-- HUD -->
+  <div id="monHud">
+    <div class="mon-top">
+      <div>
+        <span class="hud-badge hud-scene" id="hScene">◆ NO SIGNAL</span>
+        <span class="hud-badge hud-lut"   id="hLut">LUT: NONE</span>
+        <span class="hud-badge hud-conf"  id="hConf">-- CONF</span>
+      </div>
+      <div style="text-align:right">
+        <div class="rec-indicator">
+          <div class="rec-dot" id="recDot"></div>
+          <span id="recLabel">MONITOR</span>
+        </div>
+        <div style="font-size:8px;color:var(--muted);margin-top:4px" id="recTimer">00:00:00</div>
+      </div>
+    </div>
+    <div class="mon-bot">
+      <div style="font-size:8px;color:rgba(255,255,255,0.3);letter-spacing:1px" id="monInfo">
+        WAITING FOR CAMERA...
+      </div>
+      <div style="font-size:8px;color:rgba(255,255,255,0.2);letter-spacing:1px" id="monRes">—</div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ CONTROL PANEL ══ -->
+<div id="panel">
+
+  <!-- ML STATUS -->
+  <div class="section">
+    <div class="section-title">ML ENGINE <span id="mlVersion">OFFLINE</span></div>
+    <div class="ml-status">
+      <div class="ml-dot" id="mlDot"></div>
+      <div class="ml-text" id="mlText">Connecting to Python server...</div>
+    </div>
+    <div class="scene-card" id="sceneCard">
+      <div class="scene-name" id="sceneName">DETECTING SCENE...</div>
+      <div class="scene-meta" id="sceneMeta">—</div>
+      <div class="scene-conf" id="sceneConf">— CONFIDENCE</div>
+    </div>
+  </div>
+
+  <!-- LIVE READOUTS -->
+  <div class="section">
+    <div class="section-title">LIVE ANALYSIS</div>
+    <div class="readout-grid">
+      <div class="readout-card"><div class="r-label">EXPOSURE</div><div class="r-val" id="rExp">—</div></div>
+      <div class="readout-card"><div class="r-label">COLOR TEMP</div><div class="r-val" id="rTemp">—</div></div>
+      <div class="readout-card"><div class="r-label">HIGHLIGHTS</div><div class="r-val" id="rHi">—</div></div>
+      <div class="readout-card"><div class="r-label">SHADOWS</div><div class="r-val" id="rSh">—</div></div>
+    </div>
+  </div>
+
+  <!-- LUT SELECTION -->
+  <div class="section">
+    <div class="section-title">CINEMATIC LUT <span id="autoLutLabel">AUTO</span></div>
+    <div class="lut-grid" id="lutGrid"></div>
+    <div class="btn-row" style="margin-top:8px">
+      <button class="btn active" id="btnAutoLut" onclick="toggleAutoLut()">AUTO ML</button>
+      <button class="btn" onclick="resetGrade()">RESET</button>
+    </div>
+  </div>
+
+  <!-- COLOR CONTROLS -->
+  <div class="section">
+    <div class="section-title">COLOR GRADE</div>
+
+    <div class="slider-row">
+      <div class="slider-label">EXP</div>
+      <input type="range" id="slExp" min="-100" max="100" value="0" oninput="onSlider(this,'exp')">
+      <div class="slider-val" id="vExp">0.0</div>
+    </div>
+    <div class="slider-row">
+      <div class="slider-label">SAT</div>
+      <input type="range" id="slSat" min="0" max="200" value="100" oninput="onSlider(this,'sat')">
+      <div class="slider-val" id="vSat">100</div>
+    </div>
+    <div class="slider-row">
+      <div class="slider-label">CON</div>
+      <input type="range" id="slCon" min="0" max="200" value="100" oninput="onSlider(this,'con')">
+      <div class="slider-val" id="vCon">100</div>
+    </div>
+    <div class="slider-row">
+      <div class="slider-label">TEMP</div>
+      <input type="range" id="slTemp" min="-100" max="100" value="0" oninput="onSlider(this,'temp')">
+      <div class="slider-val" id="vTemp">0</div>
+    </div>
+    <div class="slider-row">
+      <div class="slider-label">LIFT</div>
+      <input type="range" id="slLift" min="-50" max="50" value="0" oninput="onSlider(this,'lift')">
+      <div class="slider-val" id="vLift">0</div>
+    </div>
+    <div class="slider-row">
+      <div class="slider-label">GAIN</div>
+      <input type="range" id="slGain" min="50" max="150" value="100" oninput="onSlider(this,'gain')">
+      <div class="slider-val" id="vGain">100</div>
+    </div>
+    <div class="slider-row">
+      <div class="slider-label">HALN</div>
+      <input type="range" id="slHaln" min="0" max="100" value="20" oninput="onSlider(this,'haln')">
+      <div class="slider-val" id="vHaln">20</div>
+    </div>
+    <div class="slider-row">
+      <div class="slider-label">GRAIN</div>
+      <input type="range" id="slGrain" min="0" max="100" value="30" oninput="onSlider(this,'grain')">
+      <div class="slider-val" id="vGrain">30</div>
+    </div>
+  </div>
+
+  <!-- MONITOR TOOLS -->
+  <div class="section">
+    <div class="section-title">MONITOR TOOLS</div>
+    <div class="btn-row">
+      <button class="btn active" id="btnGrid"   onclick="toggleTool('grid')">GRID</button>
+      <button class="btn active" id="btnScope"  onclick="toggleTool('scope')">SCOPES</button>
+      <button class="btn"        id="btnPeak"   onclick="toggleTool('peak')">FOCUS PEAK</button>
+      <button class="btn"        id="btnZebra"  onclick="toggleTool('zebra')">ZEBRA</button>
+      <button class="btn active" id="btnVig"    onclick="toggleTool('vig')">VIGNETTE</button>
+      <button class="btn"        id="btnFlare"  onclick="toggleTool('flare')">LENS FLARE</button>
+      <button class="btn"        id="btnRays"   onclick="toggleTool('rays')">GOD RAYS</button>
+      <button class="btn active" id="btnBorder" onclick="toggleTool('border')">BORDER</button>
+    </div>
+  </div>
+
+  <!-- ASPECT RATIO -->
+  <div class="section">
+    <div class="section-title">ASPECT RATIO</div>
+    <div class="btn-row">
+      <button class="btn active" onclick="setAspect(0)">16:9</button>
+      <button class="btn"        onclick="setAspect(1)">2.39:1</button>
+      <button class="btn"        onclick="setAspect(2)">1.85:1</button>
+      <button class="btn"        onclick="setAspect(3)">4:3</button>
+      <button class="btn"        onclick="setAspect(4)">1:1</button>
+    </div>
+  </div>
+
+  <!-- RECORD -->
+  <div class="section">
+    <div class="section-title">CAPTURE</div>
+    <button class="btn btn-big btn-rec" id="btnRec" onclick="toggleRecord()">● START RECORDING</button>
+    <button class="btn btn-big" style="margin-top:4px" onclick="capturePhoto()">◎ CAPTURE PHOTO</button>
+  </div>
+
+</div>
+
+<!-- ══ STATUSBAR ══ -->
+<div id="statusbar">
+  <div class="sb-item"><div class="sb-dot" id="sbPhone"></div><span id="sbPhoneText">PHONE: OFFLINE</span></div>
+  <div class="sb-item"><div class="sb-dot" id="sbML"></div><span id="sbMLText">ML: OFFLINE</span></div>
+  <div class="sb-item"><div class="sb-dot" id="sbWGL"></div><span id="sbWGLText">WEBGL: —</span></div>
+  <div class="spacer"></div>
+  <div class="sb-item"><span id="sbFps">— FPS</span></div>
+  <div class="sb-item"><span id="sbRes">— × —</span></div>
+</div>
+
+<script src="luts.js"></script>
+<script src="webgl_laptop.js"></script>
+<script src="laptop.js"></script>
+</body>
+</html>

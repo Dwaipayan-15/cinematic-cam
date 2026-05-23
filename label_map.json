@@ -1,0 +1,42 @@
+{
+  "0": {
+    "scene": "golden_hour",
+    "lut": "golden"
+  },
+  "1": {
+    "scene": "sunset",
+    "lut": "kodak"
+  },
+  "2": {
+    "scene": "outdoor_day",
+    "lut": "arri"
+  },
+  "3": {
+    "scene": "overcast",
+    "lut": "fuji"
+  },
+  "4": {
+    "scene": "blue_hour",
+    "lut": "moon"
+  },
+  "5": {
+    "scene": "night",
+    "lut": "bleach"
+  },
+  "6": {
+    "scene": "interior_warm",
+    "lut": "kodak"
+  },
+  "7": {
+    "scene": "interior_cool",
+    "lut": "fuji"
+  },
+  "8": {
+    "scene": "portrait",
+    "lut": "arri"
+  },
+  "9": {
+    "scene": "high_contrast",
+    "lut": "bleach"
+  }
+}
